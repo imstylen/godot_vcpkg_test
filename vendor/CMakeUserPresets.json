@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "default",
+      "inherits": "vcpkg",
+      "generator": "Visual Studio 17 2022",
+      "environment": {
+        "VCPKG_ROOT": "C:/Dev/2_Library/vcpkg"
+      }
+    }
+  ]
+}

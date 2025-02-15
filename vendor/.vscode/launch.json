@@ -1,0 +1,18 @@
+{
+    "configurations": [
+
+        {
+            "name": "Main",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/HelloWorld.exe",
+            "preLaunchTask": "cmake all build",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "internalConsoleOptions": "openOnSessionStart",
+            "environment": [],
+        },
+
+    ]
+}

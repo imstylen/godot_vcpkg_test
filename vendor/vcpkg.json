@@ -1,0 +1,10 @@
+{
+  "dependencies": [
+    {
+      "name": "poppler",
+      "features": [
+        "cairo"
+      ]
+    }
+  ]
+}
