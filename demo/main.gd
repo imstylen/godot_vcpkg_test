@@ -18,7 +18,7 @@ func render_worker():
 	while is_worker_running:
 		if render_queue.size() > 0:
 			var render_page_index:int = render_queue.pop_front()
-			var new_texture: Texture2D = test_node.get_page_image(render_page_index,450)
+			var new_texture: Texture2D = test_node.get_page_image(render_page_index,350)
 			page_cache["high_%d" % render_page_index] = new_texture
 			call_deferred("_finalize_texture",render_page_index)
 			
@@ -71,6 +71,7 @@ func go_to_next_page(delta) -> void:
 	
 	if page_cache.has("high_%d" % current_page):
 		texture = page_cache["high_%d" % current_page]
+		_update_stroke_page()
 		return
 		
 	var new_texture: Texture2D = test_node.get_page_image(current_page,25)
@@ -84,6 +85,7 @@ func go_to_next_page(delta) -> void:
 	
 	texture = new_texture
 	scale = Vector2(slow_dpi/fast_dpi, slow_dpi/fast_dpi)
+	_update_stroke_page()
 	
 	render_queue.push_front(current_page)
 	
@@ -91,3 +93,7 @@ func _finalize_texture(page_index: int):
 	if current_page == page_index:
 		texture = page_cache["high_%d" % current_page]
 		scale = Vector2(1,1)
+		_update_stroke_page()
+		
+func _update_stroke_page():
+	$StrokeRenderer.go_to_page(current_page,texture.get_width(),texture.get_height())

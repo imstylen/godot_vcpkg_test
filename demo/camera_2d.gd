@@ -10,6 +10,7 @@ func _ready() -> void:
 	# Makes this Camera2D the current (active) camera
 	make_current()
 
+
 func _input(event: InputEvent) -> void:
 	# Handle mouse wheel for zoom
 	if event is InputEventMouseButton:
@@ -36,3 +37,11 @@ func _zoom_camera(delta_zoom: float) -> void:
 	var new_zoom = zoom.x + delta_zoom
 	new_zoom = clamp(new_zoom, min_zoom, max_zoom)
 	zoom = Vector2(new_zoom, new_zoom)
+	
+func _process(delta: float) -> void:
+	var mouse_loc:Vector2 = get_global_mouse_position()
+	var zoom:Vector2 = get_viewport_transform().get_scale()
+	$CanvasLayer/Label.text = "mouse: %v
+	zoom: %v
+	" % [mouse_loc, zoom]
+	
