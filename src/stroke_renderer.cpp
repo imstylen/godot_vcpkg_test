@@ -6,8 +6,11 @@
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/camera2d.hpp>
 
+#include "pixel_converter.h"
+
 StrokeRenderer::StrokeRenderer() {
-    // Set up initial page; do not request render here because _ready() hasn't run yet.
+
+
 }
 
 void StrokeRenderer::go_to_page(int p, int w, int h) {
@@ -75,6 +78,10 @@ void StrokeRenderer::_ready() {
     go_to_page(0, 800, 600);
     // Optionally, trigger an initial render if needed:
     request_render();
+
+    Ref<PixelConverter> converter;
+    converter.instantiate();
+    converter->compute();
 }
 
 void StrokeRenderer::_process(double delta) {
