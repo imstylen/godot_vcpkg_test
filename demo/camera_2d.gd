@@ -43,5 +43,6 @@ func _process(delta: float) -> void:
 	var zoom:Vector2 = get_viewport_transform().get_scale()
 	$CanvasLayer/Label.text = "mouse: %v
 	zoom: %v
-	" % [mouse_loc, zoom]
+	delta: %f
+	" % [mouse_loc, zoom, 1/delta]
 	

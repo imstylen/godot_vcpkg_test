@@ -5,16 +5,18 @@
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/camera2d.hpp>
+#include <godot_cpp/classes/shader.hpp>
+#include <godot_cpp/classes/shader_material.hpp>
+
+
 
 StrokeRenderer::StrokeRenderer() {
     // Set up initial page; do not request render here because _ready() hasn't run yet.
 }
 
 void StrokeRenderer::go_to_page(int p, int w, int h) {
-
     render_mutex->lock();
     bool change = current_page != p;
-
     current_page = p;
 
     // Clean up any previous Cairo resources
@@ -23,16 +25,16 @@ void StrokeRenderer::go_to_page(int p, int w, int h) {
         cairo_destroy(cairo_ctx);
     }
 
-    // Create a new Cairo surface and context
+    // Create a new Cairo surface and context.
     cairo_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
     cairo_ctx = cairo_create(cairo_surface);
 
-    // Create a Godot image and texture
+    // Create a Godot image and texture.
     image = Image::create(w, h, false, Image::FORMAT_RGBA8);
     texture = ImageTexture::create_from_image(image);
     set_texture(texture);
 
-    // Initialize the page map if this page doesn't exist
+    // Initialize the page map if this page doesn't exist.
     if (page_map.find(p) == page_map.end()) {
         page_map.emplace(p, std::vector<Stroke>());
     }
@@ -40,22 +42,19 @@ void StrokeRenderer::go_to_page(int p, int w, int h) {
 
     render_mutex->unlock();
 
-    if(change)
-    {
+    if (change) {
         request_render();
     }
-
 }
 
 StrokeRenderer::~StrokeRenderer() {
     running = false;
     if (render_semaphore.is_valid()) {
-        render_semaphore->post();  // Wake up worker thread so it can exit
+        render_semaphore->post();  // Wake up worker thread so it can exit.
     }
     if (render_thread.is_valid()) {
-        render_thread->wait_to_finish(); // Ensure the thread stops safely
+        render_thread->wait_to_finish(); // Ensure the thread stops safely.
     }
-
     cairo_destroy(cairo_ctx);
     cairo_surface_destroy(cairo_surface);
 }
@@ -64,7 +63,7 @@ void StrokeRenderer::_ready() {
     set_process(true);
     set_process_input(true);
 
-    // Instantiate threading objects in _ready()
+    // Instantiate threading objects in _ready().
     render_thread.instantiate();
     render_mutex.instantiate();
     render_semaphore.instantiate();
@@ -73,14 +72,13 @@ void StrokeRenderer::_ready() {
     render_thread->start(callable_mp(this, &StrokeRenderer::render_worker));
 
     go_to_page(0, 800, 600);
-    // Optionally, trigger an initial render if needed:
+    // Optionally, trigger an initial render if needed.
     request_render();
 }
 
 void StrokeRenderer::_process(double delta) {
-
-        // request_render();
-    
+    // You can throttle or trigger renders here if needed.
+    // UtilityFunctions::print(delta);
 }
 
 void StrokeRenderer::_input(const Ref<InputEvent>& event) {
@@ -108,7 +106,7 @@ void StrokeRenderer::start_stroke(double x, double y) {
     Stroke& last_stroke = strokes->back();
     last_stroke.points.push_back({ x, y });
     last_stroke.width = 10.0;
-    last_stroke.color[0] = 255;
+    last_stroke.color[0] = 1;
     last_stroke.color[1] = 0;
     last_stroke.color[2] = 0;
     request_render();
@@ -133,7 +131,7 @@ void StrokeRenderer::request_render() {
     render_mutex->lock();
     if (!render_requested) {
         render_requested = true;
-        render_semaphore->post();  // Signal the worker thread
+        render_semaphore->post();  // Signal the worker thread.
     }
     render_mutex->unlock();
 }
@@ -156,30 +154,14 @@ void StrokeRenderer::render_worker() {
         // Render strokes using the local context.
         render_cairo(local_ctx, local_strokes);
 
-        // After drawing, perform pixel conversion using our local surface.
-        {
-            cairo_surface_flush(local_surface);
-            int width = cairo_image_surface_get_width(local_surface);
-            int height = cairo_image_surface_get_height(local_surface);
-            int stride = cairo_image_surface_get_stride(local_surface);
-            int bytes_total = width * height * 4;
-            updated_data.resize(bytes_total);
-
-            uint8_t* dst_ptr = updated_data.ptrw();
-            unsigned char* data = cairo_image_surface_get_data(local_surface);
-
-            for (int y = 0; y < height; y++) {
-                uint8_t* src_row = data + y * stride;
-                for (int x = 0; x < width; x++) {
-                    int src_i = x * 4;
-                    int dst_i = (y * width + x) * 4;
-                    dst_ptr[dst_i + 0] = src_row[src_i + 2]; // R
-                    dst_ptr[dst_i + 1] = src_row[src_i + 1]; // G
-                    dst_ptr[dst_i + 2] = src_row[src_i + 0]; // B
-                    dst_ptr[dst_i + 3] = src_row[src_i + 3]; // A
-                }
-            }
-        }
+        // After drawing, flush the surface.
+        cairo_surface_flush(local_surface);
+        // Instead of performing a CPU-side channel swap, we simply copy the raw data.
+        int width = cairo_image_surface_get_width(local_surface);
+        int height = cairo_image_surface_get_height(local_surface);
+        int bytes_total = width * height * 4;
+        updated_data.resize(bytes_total);
+        memcpy(updated_data.ptrw(), cairo_image_surface_get_data(local_surface), bytes_total);
 
         new_texture_ready = true;
         render_requested = false;
@@ -201,7 +183,6 @@ void StrokeRenderer::render_cairo(cairo_t* local_ctx, const std::vector<Stroke>&
 
     // Now draw the strokes.
     for (const auto& stroke : in_strokes) {
-        // Use your desired transparency here (e.g., 0.5)
         cairo_set_source_rgba(local_ctx, stroke.color[0], stroke.color[1], stroke.color[2], 0.5);
         cairo_set_line_width(local_ctx, stroke.width);
         if (!stroke.points.empty()) {
@@ -214,52 +195,13 @@ void StrokeRenderer::render_cairo(cairo_t* local_ctx, const std::vector<Stroke>&
     }
 }
 
-// void StrokeRenderer::render_cairo(std::vector<Stroke>& in_strokes) {
-//     // Assumes render_mutex is held.
-//     // cairo_set_source_rgb(cairo_ctx, 1, 1, 1);
-//     // cairo_paint(cairo_ctx);
-
-//     for (const auto& stroke : in_strokes) {
-//         cairo_set_source_rgb(cairo_ctx, stroke.color[0], stroke.color[1], stroke.color[2]);
-//         cairo_set_line_width(cairo_ctx, stroke.width);
-//         if (!stroke.points.empty()) {
-//             cairo_move_to(cairo_ctx, stroke.points[0].x, stroke.points[0].y);
-//             for (size_t i = 1; i < stroke.points.size(); ++i) {
-//                 cairo_line_to(cairo_ctx, stroke.points[i].x, stroke.points[i].y);
-//             }
-//             cairo_stroke(cairo_ctx);
-//         }
-//     }
-
-//     // Convert the Cairo surface data (BGRA on little-endian) to Godot's RGBA.
-//     cairo_surface_flush(cairo_surface);
-//     unsigned char* data = cairo_image_surface_get_data(cairo_surface);
-//     int width = cairo_image_surface_get_width(cairo_surface);
-//     int height = cairo_image_surface_get_height(cairo_surface);
-//     int stride = cairo_image_surface_get_stride(cairo_surface);
-//     int bytes_total = width * height * 4;
-//     updated_data.resize(bytes_total);
-
-//     uint8_t* dst_ptr = updated_data.ptrw();
-//     for (int y = 0; y < height; y++) {
-//         uint8_t* src_row = data + y * stride;
-//         for (int x = 0; x < width; x++) {
-//             int src_i = x * 4;
-//             int dst_i = (y * width + x) * 4;
-//             dst_ptr[dst_i + 0] = src_row[src_i + 2]; // R
-//             dst_ptr[dst_i + 1] = src_row[src_i + 1]; // G
-//             dst_ptr[dst_i + 2] = src_row[src_i + 0]; // B
-//             dst_ptr[dst_i + 3] = src_row[src_i + 3]; // A
-//         }
-//     }
-// }
-
 void StrokeRenderer::apply_texture() {
     // This function is called on the main thread.
     render_mutex->lock();
     if (new_texture_ready) {
         int width = cairo_image_surface_get_width(cairo_surface);
         int height = cairo_image_surface_get_height(cairo_surface);
+        // Create an image directly from the raw data.
         image = Image::create_from_data(width, height, false, Image::FORMAT_RGBA8, updated_data);
         texture->update(image);
         set_texture(texture);
@@ -279,5 +221,4 @@ void StrokeRenderer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("go_to_page", "p", "w", "h"), &StrokeRenderer::go_to_page);
     ClassDB::bind_method(D_METHOD("get_texture"), &StrokeRenderer::get_texture);
     ClassDB::bind_method(D_METHOD("apply_texture"), &StrokeRenderer::apply_texture);
-    // 'apply_texture' is called via call_deferred so no need to bind it.
 }
