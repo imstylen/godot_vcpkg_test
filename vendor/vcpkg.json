@@ -3,7 +3,8 @@
     {
       "name": "poppler",
       "features": [
-        "cairo"
+        "cairo",
+        "glib"
       ]
     }
   ]
